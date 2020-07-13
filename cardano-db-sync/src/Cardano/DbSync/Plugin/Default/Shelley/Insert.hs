@@ -49,7 +49,7 @@ import qualified Shelley.Spec.Ledger.TxData as Shelley
 
 
 insertShelleyBlock
-    :: Trace IO Text -> DbSyncEnv -> ShelleyBlock -> Tip ShelleyBlock
+    :: Trace IO Text -> DbSyncEnv -> ShelleyBlock TPraosStandardCrypto -> Tip (ShelleyBlock TPraosStandardCrypto)
     -> ReaderT SqlBackend (LoggingT IO) (Either DbSyncNodeError ())
 insertShelleyBlock tracer env blk tip = do
   runExceptT $ do

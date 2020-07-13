@@ -47,7 +47,7 @@ import qualified Shelley.Spec.Ledger.Genesis as Shelley
 data GenesisEra
   = GenesisByron !Byron.Config
   | GenesisShelley !(ShelleyGenesis TPraosStandardCrypto)
-  -- | GenesisCardano !Byron.Config !(ShelleyGenesis TPraosStandardCrypto)
+  | GenesisCardano !Byron.Config !(ShelleyGenesis TPraosStandardCrypto)
 
 
 genesisEnv :: GenesisEra -> DbSyncEnv
@@ -55,19 +55,22 @@ genesisEnv ge =
   case ge of
     GenesisByron _ -> ByronEnv
     GenesisShelley sCfg -> ShelleyEnv $ Shelley.sgNetworkId sCfg
+    GenesisCardano _ sCfg -> ShelleyEnv $ Shelley.sgNetworkId sCfg
 
 genesisNetworkMagic :: GenesisEra -> NetworkMagic
 genesisNetworkMagic ge =
-  case ge of
-    GenesisByron bg ->
-      NetworkMagic $ unProtocolMagicId (Byron.configProtocolMagicId bg)
-    GenesisShelley sg -> NetworkMagic $ Shelley.sgNetworkMagic sg
+  NetworkMagic $
+    case ge of
+      GenesisByron bg -> unProtocolMagicId (Byron.configProtocolMagicId bg)
+      GenesisShelley sg -> Shelley.sgNetworkMagic sg
+      GenesisCardano _ sg -> Shelley.sgNetworkMagic sg
 
 genesisProtocolMagic :: GenesisEra -> ProtocolMagic
 genesisProtocolMagic ge =
     case ge of
       GenesisByron bg -> Byron.configProtocolMagic bg
       GenesisShelley sg -> mkShelleyProtocolMagic sg
+      GenesisCardano _ sg -> mkShelleyProtocolMagic sg
   where
     mkShelleyProtocolMagic :: ShelleyGenesis TPraosStandardCrypto -> ProtocolMagic
     mkShelleyProtocolMagic sg =
@@ -87,6 +90,9 @@ insertValidateGenesisDist trce nname genCfg =
     GenesisByron bCfg ->
       Byron.insertValidateGenesisDist trce (unNetworkName nname) bCfg
     GenesisShelley sCfg ->
+      Shelley.insertValidateGenesisDist trce (unNetworkName nname) sCfg
+    GenesisCardano bCfg sCfg -> do
+      Byron.insertValidateGenesisDist trce (unNetworkName nname) bCfg
       Shelley.insertValidateGenesisDist trce (unNetworkName nname) sCfg
 
 -- -----------------------------------------------------------------------------

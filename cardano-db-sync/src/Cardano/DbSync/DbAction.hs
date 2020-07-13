@@ -22,8 +22,10 @@ import           Control.Concurrent.STM.TBQueue (TBQueue)
 import qualified Control.Concurrent.STM.TBQueue as TBQ
 
 import           Ouroboros.Consensus.Byron.Ledger (ByronBlock (..))
+import           Ouroboros.Consensus.Cardano.Block (CardanoBlock)
+import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
+import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
 import           Ouroboros.Network.Block (Point (..), Tip)
-
 
 data DbAction
   = DbApplyBlock !CardanoBlockTip
@@ -44,9 +46,15 @@ instance MkDbAction ByronBlock where
   mkDbApply blk tip = DbApplyBlock (ByronBlockTip blk tip)
   mkDbRollback point = DbRollBackToPoint (ByronPoint point)
 
-instance MkDbAction ShelleyBlock where
+instance MkDbAction (ShelleyBlock TPraosStandardCrypto) where
   mkDbApply blk tip = DbApplyBlock (ShelleyBlockTip blk tip)
   mkDbRollback point = DbRollBackToPoint (ShelleyPoint point)
+
+instance MkDbAction (CardanoBlock TPraosStandardCrypto) where
+  mkDbApply _blk _tip = DbApplyBlock (panic "mkDbApply: CardanoBlock")
+  mkDbRollback _point = DbRollBackToPoint (panic "mkDbRollback: CardanoBlock")
+
+
 
 lengthDbActionQueue :: DbActionQueue -> STM Natural
 lengthDbActionQueue (DbActionQueue q) = STM.lengthTBQueue q

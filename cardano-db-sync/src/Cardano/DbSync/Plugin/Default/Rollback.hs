@@ -28,6 +28,8 @@ rollbackToPoint trce cpnt =
       Byron.rollbackToPoint trce point
     ShelleyPoint point ->
       Shelley.rollbackToPoint trce point
+    CardanoPoint point ->
+      case point of
 
 -- For testing and debugging.
 unsafeRollback :: Trace IO Text -> SlotNo -> IO (Either DbSyncNodeError ())

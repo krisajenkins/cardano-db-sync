@@ -35,3 +35,5 @@ insertCardanoBlock tracer env blkTip = do
       Byron.insertByronBlock tracer blk tip
     ShelleyBlockTip blk tip ->
       Shelley.insertShelleyBlock tracer env blk tip
+    CardanoBlockTip blk tip ->
+      case blk of

@@ -41,6 +41,8 @@ import           Cardano.DbSync.Types
 import           Cardano.DbSync.Util
 
 import           Ouroboros.Consensus.Byron.Ledger (ByronBlock (..))
+import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock (..))
+import           Ouroboros.Network.Block (Point (..))
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -86,6 +88,13 @@ epochPluginInsertBlock trce _env blkTip = do
           insertBlock trce (Byron.epochNumber blk slotsPerEpoch) (SlotNo $ Byron.slotNumber blk)
     ShelleyBlockTip sblk _tip ->
       insertBlock trce (Shelley.epochNumber sblk slotsPerEpoch) (SlotNo $ Shelley.slotNumber sblk)
+    CardanoBlockTip cblk _tip ->
+      case cblk of
+        ByronBlock blk _ _ ->
+          insertBlock trce (Byron.epochNumber blk slotsPerEpoch) (SlotNo $ Byron.slotNumber blk)
+        ShelleyBlock a b ->
+          let sblk = ShelleyBlock a b in
+          insertBlock trce (Shelley.epochNumber sblk slotsPerEpoch) (SlotNo $ Shelley.slotNumber sblk)
 
 -- Nothing to be done here.
 -- Rollback will take place in the Default plugin and the epoch table will be recalculated.

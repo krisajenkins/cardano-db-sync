@@ -74,6 +74,8 @@ import           Network.TypedProtocol.Pipelined (Nat(Zero, Succ))
 import           Ouroboros.Consensus.Block.Abstract (CodecConfig, ConvertRawHash (..))
 import           Ouroboros.Consensus.Byron.Ledger.Config (mkByronCodecConfig)
 import           Ouroboros.Consensus.Byron.Node ()
+import           Ouroboros.Consensus.Cardano.Block (CodecConfig (..))
+import           Ouroboros.Consensus.Cardano.Node ()
 import           Ouroboros.Consensus.Network.NodeToClient (ClientCodecs,
                     cChainSyncCodec, cStateQueryCodec, cTxSubmissionCodec)
 import           Ouroboros.Consensus.Node.ErrorPolicy (consensusErrorPolicy)
@@ -149,10 +151,13 @@ runDbSyncNode plugin enp =
           GenesisShelley sCfg ->
             runDbSyncNodeNodeClient (ShelleyEnv $ Shelley.sgNetworkId sCfg)
                 iomgr trce plugin shelleyCodecConfig networkMagic (enpSocketPath enp)
-
-
-shelleyCodecConfig :: CodecConfig ShelleyBlock
-shelleyCodecConfig = ShelleyCodecConfig
+          GenesisCardano bCfg sCfg ->
+            runDbSyncNodeNodeClient (ShelleyEnv $ Shelley.sgNetworkId sCfg)
+                iomgr trce plugin (CardanoCodecConfig (mkByronCodecConfig bCfg) shelleyCodecConfig)
+                networkMagic (enpSocketPath enp)
+  where
+    shelleyCodecConfig :: CodecConfig ShelleyBlock
+    shelleyCodecConfig = ShelleyCodecConfig
 
 -- -------------------------------------------------------------------------------------------------
 
