@@ -114,7 +114,7 @@ extra-deps:
       - shelley/chain-and-ledger/executable-spec/test
 
   - git: https://github.com/input-output-hk/ouroboros-network
-    commit: 0e994c36a072936eb7cf37b1a9cf48fcba32de89
+    commit: dae680f8e6b0af611c323554c375f50b3bfd5308
     subdirs:
       - cardano-client
       - io-sim
