@@ -46,6 +46,7 @@ import           Cardano.DbSync.Metrics
 import           Cardano.DbSync.Plugin (DbSyncNodePlugin (..))
 import           Cardano.DbSync.Plugin.Default (defDbSyncNodePlugin)
 import           Cardano.DbSync.Plugin.Default.Rollback (unsafeRollback)
+import           Cardano.DbSync.StateQuery (StateQueryTMVar (..), localStateQueryHandler, newStateQueryTMVar)
 import           Cardano.DbSync.Tracing.ToObjectOrphans ()
 import           Cardano.DbSync.Types
 import           Cardano.DbSync.Util
@@ -61,11 +62,11 @@ import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Except.Exit (orDie)
 
 import qualified Data.ByteString.Lazy as BSL
+import           Data.Functor.Contravariant (contramap)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Void (Void)
 
-import           Network.Socket (SockAddr (..))
 import           Network.Mux (MuxTrace, WithMuxBearer)
 import           Network.Mux.Types (MuxMode (..))
 
@@ -75,10 +76,15 @@ import           Network.TypedProtocol.Pipelined (Nat(Zero, Succ))
 import           Ouroboros.Consensus.Block.Abstract (CodecConfig, ConvertRawHash (..))
 import           Ouroboros.Consensus.Byron.Ledger.Config (mkByronCodecConfig)
 import           Ouroboros.Consensus.Byron.Node ()
+import           Ouroboros.Consensus.Cardano.Block (CodecConfig (..))
+import           Ouroboros.Consensus.Cardano.Node ()
 import           Ouroboros.Consensus.Network.NodeToClient (ClientCodecs,
                     cChainSyncCodec, cStateQueryCodec, cTxSubmissionCodec)
 import           Ouroboros.Consensus.Node.ErrorPolicy (consensusErrorPolicy)
 import           Ouroboros.Consensus.Node.Run (RunNode)
+import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
+import           Ouroboros.Consensus.Shelley.Ledger.Config (CodecConfig (ShelleyCodecConfig))
+import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
 
 import           Ouroboros.Network.Magic (NetworkMagic)
 import qualified Ouroboros.Network.NodeToClient.Version as Network
@@ -88,10 +94,8 @@ import           Ouroboros.Network.Mux (MuxPeer (..),  RunMiniProtocol (..))
 import           Ouroboros.Network.NodeToClient (IOManager, ClientSubscriptionParams (..),
                     ConnectionId, ErrorPolicyTrace (..), Handshake, LocalAddress,
                     NetworkSubscriptionTracers (..), NodeToClientProtocols (..),
-                    TraceSendRecv, WithAddr (..), localSnocket, localStateQueryPeerNull,
-                    localTxSubmissionPeerNull, networkErrorPolicies, withIOManager)
-import           Ouroboros.Consensus.Shelley.Ledger.Config (CodecConfig (ShelleyCodecConfig))
-
+                    TraceSendRecv, WithAddr (..), localSnocket, localTxSubmissionPeerNull,
+                    networkErrorPolicies, withIOManager)
 import qualified Ouroboros.Network.Point as Point
 import           Ouroboros.Network.Point (withOrigin)
 
@@ -111,8 +115,6 @@ import qualified Prelude
 import qualified Shelley.Spec.Ledger.Genesis as Shelley
 
 import qualified System.Metrics.Prometheus.Metric.Gauge as Gauge
-
-data Peer = Peer SockAddr SockAddr deriving Show
 
 
 runDbSyncNode :: DbSyncNodePlugin -> DbSyncNodeParams -> IO ()
@@ -150,18 +152,23 @@ runDbSyncNode plugin enp =
           GenesisShelley sCfg ->
             runDbSyncNodeNodeClient (ShelleyEnv $ Shelley.sgNetworkId sCfg)
                 iomgr trce plugin shelleyCodecConfig networkMagic (enpSocketPath enp)
-
-
-shelleyCodecConfig :: CodecConfig ShelleyBlock
-shelleyCodecConfig = ShelleyCodecConfig
+          GenesisCardano bCfg sCfg ->
+            runDbSyncNodeNodeClient (ShelleyEnv $ Shelley.sgNetworkId sCfg)
+                iomgr trce plugin (CardanoCodecConfig (mkByronCodecConfig bCfg) shelleyCodecConfig)
+                networkMagic (enpSocketPath enp)
+  where
+    shelleyCodecConfig :: CodecConfig (ShelleyBlock TPraosStandardCrypto)
+    shelleyCodecConfig = ShelleyCodecConfig
 
 -- -------------------------------------------------------------------------------------------------
 
 runDbSyncNodeNodeClient
     :: forall blk. (MkDbAction blk, RunNode blk)
-    => DbSyncEnv -> IOManager -> Trace IO Text -> DbSyncNodePlugin -> CodecConfig blk-> NetworkMagic -> SocketPath
+    => DbSyncEnv -> IOManager -> Trace IO Text -> DbSyncNodePlugin
+    -> CodecConfig blk-> NetworkMagic -> SocketPath
     -> IO ()
 runDbSyncNodeNodeClient env iomgr trce plugin codecConfig magic (SocketPath socketPath) = do
+  queryVar <- newStateQueryTMVar
   logInfo trce $ "localInitiatorNetworkApplication: connecting to node via " <> textShow socketPath
   void $ subscribe
     (localSnocket iomgr socketPath)
@@ -169,7 +176,7 @@ runDbSyncNodeNodeClient env iomgr trce plugin codecConfig magic (SocketPath sock
     magic
     networkSubscriptionTracers
     clientSubscriptionParams
-    (dbSyncProtocols trce env plugin)
+    (dbSyncProtocols trce env plugin queryVar)
   where
     clientSubscriptionParams = ClientSubscriptionParams {
         cspAddress = Snocket.localAddressFromPath socketPath,
@@ -203,15 +210,16 @@ dbSyncProtocols
   => Trace IO Text
   -> DbSyncEnv
   -> DbSyncNodePlugin
+  -> StateQueryTMVar
   -> Network.NodeToClientVersion
   -> ClientCodecs blk IO
   -> ConnectionId LocalAddress
   -> NodeToClientProtocols 'InitiatorMode BSL.ByteString IO () Void
-dbSyncProtocols trce env plugin _version codecs _connectionId =
+dbSyncProtocols trce env plugin queryVar _version codecs _connectionId =
     NodeToClientProtocols {
           localChainSyncProtocol = localChainSyncProtocol
         , localTxSubmissionProtocol = dummylocalTxSubmit
-        , localStateQueryProtocol = dummyLocalQueryProtocol
+        , localStateQueryProtocol = localStateQuery
         }
   where
     localChainSyncTracer :: Tracer IO (TraceSendRecv (ChainSync blk (Tip blk)))
@@ -248,12 +256,13 @@ dbSyncProtocols trce env plugin _version codecs _connectionId =
         (cTxSubmissionCodec codecs)
         localTxSubmissionPeerNull
 
-    dummyLocalQueryProtocol :: RunMiniProtocol 'InitiatorMode BSL.ByteString IO () Void
-    dummyLocalQueryProtocol =
+    localStateQuery :: RunMiniProtocol 'InitiatorMode BSL.ByteString IO () Void
+    localStateQuery =
       InitiatorProtocolOnly $ MuxPeer
-        Logging.nullTracer
+        (contramap (Text.pack . show) . toLogObject $ appendName "local-state-query" trce)
         (cStateQueryCodec codecs)
-        localStateQueryPeerNull
+        (localStateQueryHandler trce queryVar)
+
 
 logDbState :: Trace IO Text -> IO ()
 logDbState trce = do
@@ -272,7 +281,7 @@ logDbState trce = do
         (Just slotNo, Just blkNo) -> "slot " ++ show slotNo ++ ", block " ++ show blkNo
         (Just slotNo, Nothing) -> "slot " ++ show slotNo
         (Nothing, Just blkNo) -> "block " ++ show blkNo
-        (Nothing, Nothing) -> "empty (genesis)"
+        (Nothing, Nothing) -> "genesis"
 
 
 getLatestPoints :: forall blk. ConvertRawHash blk => IO [Point blk]

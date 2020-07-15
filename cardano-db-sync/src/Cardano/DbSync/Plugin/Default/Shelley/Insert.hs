@@ -38,6 +38,8 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Strict as Map
 import qualified Data.Text.Encoding as Text
 
+import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
+import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
 import           Ouroboros.Network.Block (BlockNo (..), Tip)
 
 import qualified Shelley.Spec.Ledger.Address as Shelley
@@ -49,7 +51,7 @@ import qualified Shelley.Spec.Ledger.TxData as Shelley
 
 
 insertShelleyBlock
-    :: Trace IO Text -> DbSyncEnv -> ShelleyBlock -> Tip ShelleyBlock
+    :: Trace IO Text -> DbSyncEnv -> ShelleyBlock TPraosStandardCrypto -> Tip (ShelleyBlock TPraosStandardCrypto)
     -> ReaderT SqlBackend (LoggingT IO) (Either DbSyncNodeError ())
 insertShelleyBlock tracer env blk tip = do
   runExceptT $ do

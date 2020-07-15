@@ -41,6 +41,7 @@ import           Cardano.DbSync.Types
 import           Cardano.DbSync.Util
 
 import           Ouroboros.Consensus.Byron.Ledger (ByronBlock (..))
+import           Ouroboros.Consensus.Cardano.Block (HardForkBlock (..))
 
 import           System.IO.Unsafe (unsafePerformIO)
 
@@ -77,7 +78,7 @@ epochPluginInsertBlock trce _env blkTip = do
   case blkTip of
     ByronBlockTip bblk _tip ->
       case byronBlockRaw bblk of
-        Byron.ABOBBoundary _ ->
+        Byron.ABOBBoundary {} ->
           -- For the OBFT era there are no boundary blocks so we ignore them even in
           -- the Ouroboros Classic era.
           pure $ Right ()
@@ -86,6 +87,15 @@ epochPluginInsertBlock trce _env blkTip = do
           insertBlock trce (Byron.epochNumber blk slotsPerEpoch) (SlotNo $ Byron.slotNumber blk)
     ShelleyBlockTip sblk _tip ->
       insertBlock trce (Shelley.epochNumber sblk slotsPerEpoch) (SlotNo $ Shelley.slotNumber sblk)
+    CardanoBlockTip cblk _tip ->
+      case cblk of
+        BlockByron (ByronBlock bblk slot _hash) ->
+          case bblk of
+            Byron.ABOBBoundary {} -> pure $ Right ()
+            Byron.ABOBBlock blk ->
+              insertBlock trce (Byron.epochNumber blk slotsPerEpoch) slot
+        BlockShelley sblk ->
+          insertBlock trce (Shelley.epochNumber sblk slotsPerEpoch) (SlotNo $ Shelley.slotNumber sblk)
 
 -- Nothing to be done here.
 -- Rollback will take place in the Default plugin and the epoch table will be recalculated.

@@ -23,10 +23,13 @@ import           Data.Text (Text)
 
 import           Database.Persist.Sql (SqlBackend)
 
+import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
+import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
+
 import           Ouroboros.Network.Block (BlockNo (..), Point (..))
 
 
-rollbackToPoint :: Trace IO Text -> Point ShelleyBlock -> IO (Either DbSyncNodeError ())
+rollbackToPoint :: Trace IO Text -> Point (ShelleyBlock TPraosStandardCrypto) -> IO (Either DbSyncNodeError ())
 rollbackToPoint trce point =
     case Shelley.pointToSlotHash point of
       Nothing -> pure $ Right ()

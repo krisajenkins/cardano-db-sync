@@ -7,7 +7,6 @@ module Cardano.DbSync.Types
   , DbSyncNodeParams (..)
   , GenesisFile (..)
   , ShelleyAddress
-  , ShelleyBlock
   , ShelleyDCert
   , ShelleyDelegCert
   , ShelleyHash
@@ -33,7 +32,9 @@ import           Cardano.Db (MigrationDir (..))
 import           Cardano.Slotting.Slot (SlotNo (..))
 
 import           Ouroboros.Consensus.Byron.Ledger (ByronBlock (..))
+import           Ouroboros.Consensus.Cardano.Block (CardanoBlock)
 import qualified Ouroboros.Consensus.Shelley.Ledger.Block as Shelley
+import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
 import qualified Ouroboros.Consensus.Shelley.Protocol as Shelley
 import           Ouroboros.Network.Block (Point (..), Tip)
 
@@ -47,11 +48,13 @@ import qualified Shelley.Spec.Ledger.TxData as Shelley
 
 data CardanoBlockTip
   = ByronBlockTip !ByronBlock !(Tip ByronBlock)
-  | ShelleyBlockTip !ShelleyBlock !(Tip ShelleyBlock)
+  | ShelleyBlockTip !(Shelley.ShelleyBlock TPraosStandardCrypto) !(Tip (Shelley.ShelleyBlock TPraosStandardCrypto))
+  | CardanoBlockTip !(CardanoBlock TPraosStandardCrypto) !(Tip (CardanoBlock TPraosStandardCrypto))
 
 data CardanoPoint
   = ByronPoint !(Point ByronBlock)
-  | ShelleyPoint !(Point ShelleyBlock)
+  | ShelleyPoint !(Point (Shelley.ShelleyBlock TPraosStandardCrypto))
+  | CardanoPoint !(Point (CardanoBlock TPraosStandardCrypto))
 
 newtype ConfigFile = ConfigFile
   { unConfigFile :: FilePath
@@ -75,7 +78,7 @@ newtype GenesisFile = GenesisFile
   }
 
 type ShelleyAddress = Shelley.Addr Shelley.TPraosStandardCrypto
-type ShelleyBlock = Shelley.ShelleyBlock Shelley.TPraosStandardCrypto
+-- type ShelleyBlock = Shelley.ShelleyBlock Shelley.TPraosStandardCrypto
 type ShelleyDCert = Shelley.DCert Shelley.TPraosStandardCrypto
 type ShelleyDelegCert = Shelley.DelegCert Shelley.TPraosStandardCrypto
 type ShelleyHash = Shelley.ShelleyHash Shelley.TPraosStandardCrypto

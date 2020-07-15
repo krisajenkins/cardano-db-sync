@@ -122,6 +122,8 @@ checkDbState trce xs =
 
         ShelleyBlockTip {} ->
           panic "checkDbState for ShelleyBlock not yet implemented"
+        CardanoBlockTip {} ->
+          panic "checkDbState for CardanoBlock not yet implemented"
 
     isMainBlockApply :: DbAction -> Bool
     isMainBlockApply dba =
@@ -131,6 +133,7 @@ checkDbState trce xs =
             Ledger.ABOBBlock _ -> True
             Ledger.ABOBBoundary _ -> False
         DbApplyBlock (ShelleyBlockTip {}) -> False -- Should not matter.
+        DbApplyBlock (CardanoBlockTip {}) -> False -- Should not matter.
         DbRollBackToPoint {} -> False
         DbFinish -> False
 

@@ -25,6 +25,10 @@ import qualified Cardano.DbSync.Plugin.Default.Byron.Insert as Byron
 import qualified Cardano.DbSync.Plugin.Default.Shelley.Insert as Shelley
 import           Cardano.DbSync.Types
 
+import           Ouroboros.Consensus.Byron.Ledger (ByronBlock (..))
+import           Ouroboros.Consensus.Cardano.Block (HardForkBlock (..))
+-- import           Ouroboros.Consensus.HardFork.Combinator (OneEraHash (..))
+-- import           Ouroboros.Network.Block (Point (..), Tip (..))
 
 insertCardanoBlock
     :: Trace IO Text -> DbSyncEnv -> CardanoBlockTip
@@ -35,3 +39,11 @@ insertCardanoBlock tracer env blkTip = do
       Byron.insertByronBlock tracer blk tip
     ShelleyBlockTip blk tip ->
       Shelley.insertShelleyBlock tracer env blk tip
+    CardanoBlockTip cblk _tip ->
+      case cblk of
+        BlockByron (ByronBlock _blk _slot _hash) ->
+          panic "insertCardanoBlock: BlockByron"
+          -- Byron.insertByronBlock tracer blk (panic "insertCardanoBlock: Cannot provide a Tip")
+        BlockShelley _blk ->
+          panic "insertCardanoBlock: BlockShelley"
+          -- Shelley.insertShelleyBlock tracer env blk (panic "insertCardanoBlock: Cannot provide a Tip")
