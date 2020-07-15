@@ -13,7 +13,8 @@
 module Cardano.DbSync.StateQuery
   (
   -- Export to keep the compiler happy.
-    mainnetCardanoLocalNodeConnectInfo
+    demoSlotToTimeEpoch
+  , mainnetCardanoLocalNodeConnectInfo
   , queryLocalTip
   , queryHistoryInterpreter
   , getInterpreter
@@ -23,17 +24,17 @@ module Cardano.DbSync.StateQuery
   , localStateQueryHandler
   ) where
 
-import           Cardano.Api.Typed (CardanoMode, LocalNodeConnectInfo (..), NetworkId (Mainnet),
+import           Cardano.Api.Typed (CardanoMode, LocalNodeConnectInfo (..), NetworkId (Testnet),
                     NodeConsensusMode (..), queryNodeLocalState)
 import           Cardano.Api.LocalChainSync (getLocalTip)
 
-import           Cardano.BM.Trace (Trace)
+import           Cardano.BM.Trace (Trace, logError, logInfo)
 
 import           Cardano.Chain.Slotting (EpochSlots (..))
 import           Cardano.Slotting.Slot (EpochNo (..), SlotNo (..))
 
--- import qualified Cardano.Db as DB
 import           Cardano.DbSync.Types
+import           Cardano.DbSync.Util
 
 import           Cardano.Prelude
 
@@ -46,12 +47,12 @@ import           Ouroboros.Consensus.Cardano (SecurityParam (..))
 import           Ouroboros.Consensus.Cardano.Block (CardanoBlock, CardanoEras, Query (..))
 import           Ouroboros.Consensus.Cardano.Node ()
 import           Ouroboros.Consensus.HardFork.Combinator.Ledger.Query (QueryHardFork (GetInterpreter))
-import           Ouroboros.Consensus.HardFork.History.Qry (Qry (..), Interpreter)
+import           Ouroboros.Consensus.HardFork.History.Qry (Qry (..), Interpreter, interpretQuery)
 import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
 
 import           Ouroboros.Network.Block (Point (..), Tip, getTipPoint)
 import           Ouroboros.Network.Protocol.LocalStateQuery.Type (AcquireFailure, LocalStateQuery)
-
+import           Ouroboros.Network.Magic (NetworkMagic (..))
 
 -- import           Prelude (String)
 -- import qualified Prelude
@@ -70,6 +71,16 @@ localStateQueryHandler = panic "Cardano.DbSync.StateQuery.localStateQueryHandler
 
 -- -------------------------------------------------------------------------------------------------
 
+
+demoSlotToTimeEpoch :: Trace IO Text -> SocketPath -> SystemStart -> IO ()
+demoSlotToTimeEpoch tracer socket start = do
+  res <- getInterpreter socket
+  case res of
+    Left err -> logError tracer $ "demoSlotToTimeEpoch: " <> textShow err
+    Right interp -> do
+      let ires = interpretQuery interp (slotToTimeEpoch start (SlotNo 10))
+      logInfo tracer $ "demoSlotToTimeEpoch: " <> textShow ires
+
 getInterpreter :: SocketPath -> IO (Either AcquireFailure (Interpreter (CardanoEras TPraosStandardCrypto)))
 getInterpreter spath = do
   let connInfo = mainnetCardanoLocalNodeConnectInfo spath
@@ -79,8 +90,8 @@ getInterpreter spath = do
 relToUTCTime :: SystemStart -> RelativeTime -> UTCTime
 relToUTCTime (SystemStart start) (RelativeTime rel) = addUTCTime rel start
 
-_slotToTimeEpoch :: SystemStart -> SlotNo -> Qry (UTCTime, EpochNo)
-_slotToTimeEpoch start absSlot = do
+slotToTimeEpoch :: SystemStart -> SlotNo -> Qry (UTCTime, EpochNo)
+slotToTimeEpoch start absSlot = do
     relSlot <- QAbsToRelSlot absSlot
     relTime <- QRelSlotToTime relSlot
     utcTime <- relToUTCTime start <$> QRelToAbsTime relTime
@@ -96,7 +107,7 @@ mainnetCardanoLocalNodeConnectInfo
 mainnetCardanoLocalNodeConnectInfo (SocketPath path) =
   LocalNodeConnectInfo
     { localNodeSocketPath = path
-    , localNodeNetworkId = Mainnet
+    , localNodeNetworkId = Testnet (NetworkMagic 42)
     , localNodeConsensusMode = CardanoMode (EpochSlots 21600) (SecurityParam 10)
     }
 
@@ -112,6 +123,8 @@ queryHistoryInterpreter
        )
     -> IO (Either AcquireFailure (Interpreter (CardanoEras TPraosStandardCrypto)))
 queryHistoryInterpreter = queryNodeLocalState
+
+
 
 
 
