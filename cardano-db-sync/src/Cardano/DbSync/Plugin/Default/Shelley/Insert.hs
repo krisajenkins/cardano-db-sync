@@ -28,6 +28,7 @@ import qualified Cardano.Db as DB
 import qualified Cardano.DbSync.Era.Shelley.Util as Shelley
 import           Cardano.DbSync.Error
 import           Cardano.DbSync.Plugin.Default.Shelley.Query
+import           Cardano.DbSync.StateQuery
 import           Cardano.DbSync.Types
 import           Cardano.DbSync.Util
 
@@ -38,8 +39,10 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Strict as Map
 import qualified Data.Text.Encoding as Text
 
+import           Ouroboros.Consensus.BlockchainTime.WallClock.Types (SystemStart (..))
 import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
 import           Ouroboros.Consensus.Shelley.Protocol (TPraosStandardCrypto)
+
 import           Ouroboros.Network.Block (BlockNo (..), Tip)
 
 import qualified Shelley.Spec.Ledger.Address as Shelley
@@ -59,6 +62,14 @@ insertShelleyBlock tracer env blk tip = do
     pbid <- liftLookupFail "insertShelleyBlock" $ DB.queryBlockId (Shelley.blockPrevHash blk)
 
     let slotsPerEpoch = DB.metaSlotsPerEpoch meta
+
+
+
+    liftIO $ demoSlotToTimeEpoch tracer
+                    (SocketPath "../cardano-node/state-node-shelley_testnet/node.socket")
+                    (SystemStart $ DB.metaStartTime meta)
+
+
 
     slid <- lift . DB.insertSlotLeader $ Shelley.mkSlotLeader blk
     blkId <- lift . DB.insertBlock $

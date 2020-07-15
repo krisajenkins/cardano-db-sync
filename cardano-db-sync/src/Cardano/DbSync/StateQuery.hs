@@ -62,7 +62,7 @@ import           Ouroboros.Network.Magic (NetworkMagic (..))
 data StateQueryTMVar = StateQueryTMVar
 
 newStateQueryTMVar :: IO StateQueryTMVar
-newStateQueryTMVar = panic "Cardano.DbSync.StateQuery.newStateQueryTMVar"
+newStateQueryTMVar = pure StateQueryTMVar
 
 localStateQueryHandler
     :: Trace IO Text -> StateQueryTMVar
@@ -70,7 +70,6 @@ localStateQueryHandler
 localStateQueryHandler = panic "Cardano.DbSync.StateQuery.localStateQueryHandler"
 
 -- -------------------------------------------------------------------------------------------------
-
 
 demoSlotToTimeEpoch :: Trace IO Text -> SocketPath -> SystemStart -> IO ()
 demoSlotToTimeEpoch tracer socket start = do
