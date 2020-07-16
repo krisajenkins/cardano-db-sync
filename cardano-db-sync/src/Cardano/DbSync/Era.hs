@@ -47,8 +47,6 @@ import qualified Shelley.Spec.Ledger.Genesis as Shelley
 data GenesisEra
   = GenesisByron !Byron.Config
   | GenesisShelley !(ShelleyGenesis TPraosStandardCrypto)
-  -- | GenesisCardano !Byron.Config !(ShelleyGenesis TPraosStandardCrypto)
-
 
 genesisEnv :: GenesisEra -> DbSyncEnv
 genesisEnv ge =
