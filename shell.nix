@@ -19,6 +19,11 @@ let
        ps.cardano-db-sync-extended
     ];
 
+    nativeBuildInputs = [
+      zlib
+      libsodium
+    ];
+
     # These programs will be available inside the nix-shell.
     buildInputs = with haskellPackages; [
       cabal-install
@@ -31,6 +36,8 @@ let
       sqlite-interactive
       tmux
       git
+      stack
+      postgresql_11
     ];
 
     # Prevents cabal from choosing alternate plans, so that
